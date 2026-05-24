@@ -1,0 +1,41 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+ 
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+ 
+# sbx local state — Git worktrees created by --branch mode
+.sbx/
+ 
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.secret
+ 
+# Logs and outputs
+*.log
+output/
+tmp/
+ 
+# Language scratch (only if example workloads use them)
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+ 
+# Build artifacts
+dist/
+build/
+target/
+ 
