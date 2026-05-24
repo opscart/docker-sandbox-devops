@@ -110,3 +110,40 @@ Server Unavailable is expected — consistent with documented daemon lifecycle b
 3. **macOS `/private` path compatibility for worktrees (Lab 04).** On macOS, paths under `/private/var` vs `/var` caused worktree failures in v0.29.0. Fixed in v0.30.0. Lab 04 uses `--branch` mode; this fix means `--branch` is reliable on Apple Silicon macOS from this version forward.
 
 **sbx version:** v0.30.0 (`2852d3aaf659177ffb8fd9d06298ef64df6fadf7`)
+
+
+---
+
+## 2026-05-23 — kustomize official install script fails on ARM64 in Docker build context
+
+**Context:** Building `templates/dev-environment/Dockerfile` with `--platform linux/arm64`. Used the official kustomize install script from `raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh`.
+
+**Observation:**
+
+```
+=> ERROR [5/7] RUN curl -fsSL "https://raw.githubusercontent.com/.../install_kustomize.sh" | bash
+1.023 tar (child): ./kustomize_v*_linux_arm64.tar.gz: Cannot open: No such file or directory
+1.023 tar (child): Error is not recoverable: exiting now
+1.024 tar: Child returned status 2
+1.024 tar: Error is not recoverable: exiting now
+ERROR: failed to build: exit code: 2
+```
+
+The script downloads a tarball then uses a glob (`./kustomize_v*_linux_arm64.tar.gz`) to find it. The download silently fails or the glob doesn't match, leaving nothing for tar to extract.
+
+**Resolution:** Replace the install script with a direct GitHub release download using a pinned version:
+
+```dockerfile
+ARG KUSTOMIZE_VERSION=5.4.3
+
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
+    curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz" \
+    -o kustomize.tar.gz && \
+    tar xzf kustomize.tar.gz && \
+    mv kustomize /usr/local/bin/kustomize && \
+    rm kustomize.tar.gz
+```
+
+Build succeeded after this change.
+
+**sbx version:** v0.30.0 (host Docker build — not a sandbox-specific issue, but relevant to anyone building DevOps templates for ARM64)

@@ -15,10 +15,10 @@ Each lab and scenario in this repo is verified against a specific version of `sb
 | Lab / Scenario | Status | Last verified | sbx version |
 |---|---|---|---|
 | `labs/01-install-and-first-run` | ✅ verified | 2026-05-21 | v0.30.0 |
-| `labs/02-network-policy-probes` | 🚧 not yet built | — | — |
-| `labs/03-isolation-verification` | 🚧 not yet built | — | — |
-| `labs/04-parallel-coding-agents` | 🚧 not yet built | — | — |
-| `labs/05-devops-workloads` | 🚧 not yet built | — | — |
+| `labs/02-network-policy-probes` | ✅ verified | 2026-05-21 | v0.30.0 |
+| `labs/03-isolation-verification` | ✅ verified | 2026-05-21 | v0.30.0 |
+| `labs/04-parallel-coding-agents` | ✅ verified | 2026-05-23 | v0.30.0 |
+| `labs/05-devops-workloads` | ✅ verified | 2026-05-23 | v0.30.0 |
 
 ## Reverification policy
 
