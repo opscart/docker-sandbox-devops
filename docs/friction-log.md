@@ -147,3 +147,31 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
 Build succeeded after this change.
 
 **sbx version:** v0.30.0 (host Docker build — not a sandbox-specific issue, but relevant to anyone building DevOps templates for ARM64)
+
+---
+
+## 2026-05-25 — `sbx policy deny` does not remove an allow rule
+
+**Context:** Cleaning up network policy rules added during the kubernetes-debugging scenario.
+
+**Observation:**
+
+```
+$ sbx policy deny network -g host.docker.internal
+ERROR: deny network rule: deny:
+  "host.docker.internal" conflicts with existing allow rule "50403dcf-..."
+```
+
+**Explanation:** `sbx policy deny` adds a new deny rule. It does not remove an existing allow rule. When an allow rule already exists for the same resource, the deny conflicts and errors.
+
+**Resolution:** Use `sbx policy rm network` with `--resource` or `--id`:
+
+```bash
+# Remove by resource (simpler)
+sbx policy rm network -g --resource host.docker.internal
+
+# Remove by UUID (use when resource has port, e.g. localhost:57919)
+sbx policy rm network -g --id <uuid>   # get UUID from sbx policy ls
+```
+
+**sbx version:** v0.30.0
