@@ -1,0 +1,60 @@
+---
+# payments-service deployment
+# Fix applied 2026-05-25:
+#   - Memory requests raised 64Mi → 128Mi (comfortable baseline for payment processing)
+#   - Memory limits raised 64Mi → 256Mi (headroom above ~150Mi peak; prevents OOMKill)
+#   - CPU limits raised 200m → 500m (payment processing is CPU-intensive at checkout peaks)
+#   - Liveness/readiness probes updated to port 80, path / (matching nginx:alpine placeholder)
+# The service processes payment requests which require ~150Mi at peak load.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-service
+  namespace: default
+  labels:
+    app: payments-service
+    version: v1.2.3
+    team: platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payments-service
+  template:
+    metadata:
+      labels:
+        app: payments-service
+        version: v1.2.3
+    spec:
+      containers:
+        - name: payments-service
+          image: nginx:alpine          # placeholder — real image would be internal registry
+          ports:
+            - containerPort: 80
+          env:
+            - name: APP_ENV
+              value: "development"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: PORT
+              value: "80"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"         # raised from 64Mi — baseline for payment processing
+            limits:
+              cpu: "500m"
+              memory: "256Mi"         # raised from 64Mi — headroom above 150Mi peak, prevents OOMKill
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80                # corrected from 8080 — nginx:alpine placeholder serves on port 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80                # corrected from 8080 — nginx:alpine placeholder serves on port 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      restartPolicy: Always

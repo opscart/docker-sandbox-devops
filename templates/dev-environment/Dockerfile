@@ -25,11 +25,12 @@ FROM docker/sandbox-templates:claude-code-docker
 ARG KUBECTL_VERSION=v1.31.4
 ARG HELM_VERSION=v3.16.4
 ARG KUSTOMIZE_VERSION=5.4.3
+ARG K3D_VERSION=v5.7.4
 
 LABEL org.opencontainers.image.title="sbx-devops-toolkit"
 LABEL org.opencontainers.image.description="Docker Sandbox template with DevOps toolchain: kubectl, helm, kustomize, azure-cli"
 LABEL org.opencontainers.image.source="https://github.com/opscart/docker-sandbox-devops"
-LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.version="1.1.0"
 
 USER root
 
@@ -67,6 +68,12 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
 RUN curl -fsSL https://aka.ms/InstallAzureCLIDeb | bash && \
     az version --output table
 
+# k3d — Kubernetes in Docker, for running clusters inside the sandbox
+# Uses the private Docker daemon — no host Docker access needed
+RUN curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | \
+    TAG=${K3D_VERSION} bash && \
+    k3d version
+
 # Drop back to non-root agent user
 USER agent
 
@@ -74,4 +81,5 @@ USER agent
 RUN kubectl version --client --output=yaml | grep gitVersion && \
     helm version --short && \
     kustomize version && \
-    az version --output table
+    az version --output table && \
+    k3d version
