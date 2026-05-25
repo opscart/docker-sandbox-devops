@@ -2,11 +2,11 @@
 
 ## What this scenario demonstrates
 
-An AI coding agent (Claude Code) running inside a Docker Sandbox investigates and fixes a broken Kubernetes deployment. The agent has access to a real cluster via `kubectl`, can read and modify manifests in the workspace, and can redeploy — but cannot touch anything outside the sandbox boundary: no other repos, no other cluster contexts, no host credentials.
+An AI coding agent (Claude Code) running inside a Docker Sandbox investigates and fixes a broken Kubernetes deployment. The agent has access to a Kubernetes cluster via `kubectl`, can read and modify manifests in the workspace, and can redeploy — but cannot touch anything outside the sandbox boundary: no other repos, no other cluster contexts, no host credentials.
 
 ## sbx version verified
 
-`v0.30.0` on macOS Apple Silicon. Agent: Claude Code v2.1.141.
+`v0.30.0` on macOS Apple Silicon. Agent: Claude Code v2.1.141. k3d v5.7.4.
 
 ## The task
 
@@ -14,18 +14,121 @@ The `payments-service` deployment is OOMKilling in the development cluster. On-c
 
 Full task: [`TASK.md`](./TASK.md)
 
-## Setup
+---
+
+## Approach A — Self-contained (k3d inside the sandbox) ⭐ recommended for demos
+
+The cluster runs entirely inside the sandbox using its private Docker daemon. No external cluster, no kubeconfig extraction, no host network policy rules. Destroy the sandbox and everything is gone — cluster, workloads, manifests.
 
 ### Prerequisites
 
 - `sbx` v0.30.0 installed and authenticated
-- DevOps toolkit template: `shamsk22/sbx-devops-toolkit:v1.1.0` (built in [Lab 05](../../labs/05-devops-workloads/))
-- A running Kubernetes cluster accessible from your machine
-- `kubectl` working on your host: `kubectl get nodes`
+- DevOps toolkit template v1.1.0 (includes kubectl, helm, kustomize, azure-cli, k3d):
+  `shamsk22/sbx-devops-toolkit:v1.1.0`
+
+### Step 1: Start the sandbox
+
+```bash
+sbx run claude \
+  --template shamsk22/sbx-devops-toolkit:v1.1.0 \
+  --name kubernetes-debugging
+```
+
+### Step 2: Log in to Claude Code
+
+Inside the Claude Code TUI (Terminal 1):
+
+```
+/login
+```
+
+Follow the device auth flow. Without login the agent accepts input but produces no output.
+
+### Step 3: Create the k3d cluster
+
+In a second terminal:
+
+```bash
+sbx exec -it kubernetes-debugging bash
+bash /Users/<user>/Source/docker-sandbox-devops/scripts/k3d-create-sbx.sh
+```
+
+The script handles all sbx-specific fixes automatically. Expected output:
+
+```
+[HH:MM:SS] Creating k3d cluster 'dev-cluster' inside sbx sandbox...
+INFO[0005] Cluster 'dev-cluster' created successfully!
+[HH:MM:SS] Verifying cluster...
+NAME                       STATUS   ROLES    AGE   VERSION
+k3d-dev-cluster-server-0   Ready    <none>   3s    v1.30.4+k3s1
+```
+
+> **Why a special script?** Standard `k3d cluster create` hangs inside Docker Sandbox.
+> Two kernel capability gaps must be worked around — see [`../../docs/friction-log.md`](../../docs/friction-log.md)
+> for the full diagnostic trail. The script applies three fixes:
+>
+> 1. `--volume /dev/null:/dev/kmsg@all` — microVM does not expose `/dev/kmsg`; kubelet requires it at startup
+> 2. `--k3s-arg "--flannel-backend=host-gw@server:0"` — sandbox kernel has no VXLAN support; host-gw uses static routes instead
+> 3. `--env proxy@all:*` — passes sandbox proxy env vars into k3d node containers for in-container HTTP calls
+
+### Step 4: Set environment and reset demo state
+
+```bash
+export KUBECONFIG=/home/agent/.config/k3d/kubeconfig-dev-cluster.yaml
+export NO_PROXY=${NO_PROXY},0.0.0.0
+bash /Users/<user>/Source/docker-sandbox-devops/scripts/reset-demo.sh
+```
+
+The reset script:
+- Deletes any existing payments-service deployment
+- Restores the broken manifests from `manifests-broken/`
+- Applies them to the cluster
+- Watches until pods start failing (confirms demo is ready)
+
+Expected: pods enter `Running` then restart repeatedly — probe failures from the misconfigured health checks.
+
+### Step 5: Give the agent the task
+
+In Terminal 1 (Claude Code TUI):
+
+```
+Read /Users/<user>/Source/docker-sandbox-devops/scenarios/kubernetes-debugging/TASK.md
+and complete the task.
+Use KUBECONFIG=/home/agent/.config/k3d/kubeconfig-dev-cluster.yaml
+No --insecure-skip-tls-verify needed (k3d cluster, no TLS issue).
+```
+
+### Step 6: Repeat the demo
+
+For each subsequent run, just reset:
+
+```bash
+bash /Users/<user>/Source/docker-sandbox-devops/scripts/reset-demo.sh
+```
+
+No need to recreate the cluster between runs.
+
+### Cleanup
+
+```bash
+k3d cluster delete dev-cluster
+exit
+sbx rm kubernetes-debugging
+```
+
+---
+
+## Approach B — External cluster (minikube or any local cluster)
+
+The cluster runs on the host machine. The sandbox agent connects to it via a sanitized kubeconfig. Useful for testing against a real multi-node cluster.
+
+### Prerequisites
+
+- `sbx` v0.30.0 installed and authenticated
+- DevOps toolkit template: `shamsk22/sbx-devops-toolkit:v1.1.0`
+- A running Kubernetes cluster on your host: `kubectl get nodes`
 
 ### Step 1: Extract a sanitized kubeconfig
-
-Extract only the current cluster context — not your full `~/.kube/config`:
 
 ```bash
 kubectl config view --minify --flatten > scenarios/kubernetes-debugging/kubeconfig-dev.yaml
@@ -35,17 +138,15 @@ kubectl config view --minify --flatten > scenarios/kubernetes-debugging/kubeconf
 
 ### Step 2: Update the kubeconfig server address
 
-If your cluster API is on `127.0.0.1` (minikube default), the sandbox can't reach it directly — the sandbox has its own loopback. Replace with `host.docker.internal`:
+If your cluster API is on `127.0.0.1` (minikube default), replace with `host.docker.internal`:
 
 ```bash
-# macOS (note: requires -i '' for BSD sed)
+# macOS requires -i '' for BSD sed
 sed -i '' 's|https://127.0.0.1:<PORT>|https://host.docker.internal:<PORT>|g' \
   scenarios/kubernetes-debugging/kubeconfig-dev.yaml
 ```
 
-Replace `<PORT>` with your actual API server port (`kubectl cluster-info` to find it).
-
-Add TLS skip to the cluster entry (the cert is issued to `127.0.0.1`, not `host.docker.internal`):
+Add TLS skip (cert is issued to `127.0.0.1`, not `host.docker.internal`):
 
 ```yaml
 clusters:
@@ -57,20 +158,18 @@ clusters:
 
 ### Step 3: Add network policy rules
 
-The sandbox needs explicit permission to reach the host and the API server:
-
 ```bash
 sbx policy allow network -g host.docker.internal
-sbx policy allow network -g localhost:<PORT>   # your API server port
+sbx policy allow network -g localhost:<PORT>
 ```
 
 > **Why localhost?** The proxy resolves `host.docker.internal` to `localhost` internally and applies policy against `localhost:<PORT>`. Both rules are needed — adding only `host.docker.internal` is not sufficient.
 
-> **Port changes on minikube restart:** minikube assigns a random high port at cluster creation (e.g. `57919`). If minikube restarts, the port changes. Check the current port with `kubectl cluster-info`, remove the old rule (`sbx policy remove <uuid>` — get the UUID from `sbx policy ls`), and add a new one.
+> **Port changes on minikube restart:** minikube assigns a random high port at cluster creation. Check the current port with `kubectl cluster-info`. Remove old rules with `sbx policy rm network -g --resource <host>` and add new ones.
 
-> **Registry rules not needed:** `ghcr.io`, `registry-1.docker.io`, `auth.docker.io` are already covered by the default Balanced policy. Do not add them manually.
+> **Registry rules not needed:** `ghcr.io`, `registry-1.docker.io`, `auth.docker.io` are already in the default Balanced policy. Do not add them manually.
 
-### Step 4: Run the sandbox
+### Step 4: Run the sandbox and test
 
 ```bash
 sbx run claude \
@@ -78,47 +177,27 @@ sbx run claude \
   --name kubernetes-debugging
 ```
 
-### Step 5: Log in to Claude Code
-
-Inside the Claude Code TUI (Terminal 1):
-
-```
-/login
-```
-
-Follow the device auth flow. Without login the agent accepts input but produces no output.
-
-### Step 6: Deploy the broken manifests
-
-In a second terminal:
+Inside the sandbox:
 
 ```bash
-sbx exec -it kubernetes-debugging bash
-kubectl apply -f /Users/<user>/Source/docker-sandbox-devops/scenarios/kubernetes-debugging/manifests/ \
-  --insecure-skip-tls-verify
-kubectl get pods
+export KUBECONFIG=/Users/<user>/Source/docker-sandbox-devops/scenarios/kubernetes-debugging/kubeconfig-dev.yaml
+kubectl get nodes --insecure-skip-tls-verify
 ```
 
-Expected: pods enter `CrashLoopBackOff` within 30–60 seconds as the probe failures and resource limits take effect.
+### Cleanup
 
-### Step 7: Give the agent the task
-
-In Terminal 1 (Claude Code TUI):
-
+```bash
+sbx rm kubernetes-debugging
+rm scenarios/kubernetes-debugging/kubeconfig-dev.yaml
+sbx policy rm network -g --resource host.docker.internal
+sbx policy rm network -g --resource localhost:<PORT>
 ```
-Read /Users/<user>/Source/docker-sandbox-devops/scenarios/kubernetes-debugging/TASK.md
-and complete the task. Use
-KUBECONFIG=/Users/<user>/Source/docker-sandbox-devops/scenarios/kubernetes-debugging/kubeconfig-dev.yaml
-and add --insecure-skip-tls-verify to all kubectl commands.
-```
-
-Let the agent run.
 
 ---
 
-## What the agent did
+## What the agent did (verified output)
 
-The agent completed the task in 3 minutes 5 seconds. It identified **two bugs**, not one:
+The agent completed the task in ~3 minutes. It identified **two bugs**, not one:
 
 ### Bug 1 — Memory limits too low (the planted bug)
 
@@ -129,9 +208,7 @@ resources:
     memory: "64Mi"
   limits:
     memory: "64Mi"   # OOMKill at peak load (~150Mi)
-```
 
-```yaml
 # After
 resources:
   requests:
@@ -141,42 +218,20 @@ resources:
     cpu: "500m"
 ```
 
-### Bug 2 — Probe misconfiguration (found independently)
+### Bug 2 — Probe misconfiguration (found independently by the agent)
 
 ```yaml
-# Before — probes targeting wrong port and paths
+# Before — wrong port and paths for nginx:alpine
 livenessProbe:
   httpGet:
     path: /healthz
-    port: 8080      # nginx:alpine listens on 80, not 8080
-readinessProbe:
-  httpGet:
-    path: /ready    # nginx:alpine only serves /
     port: 8080
-```
 
-```yaml
 # After
 livenessProbe:
   httpGet:
     path: /
     port: 80
-readinessProbe:
-  httpGet:
-    path: /
-    port: 80
-```
-
-The probe misconfiguration was causing `CrashLoopBackOff` before any memory pressure could develop. The agent caught it independently — it was not in the task description.
-
-### Service fix
-
-```yaml
-# Before
-targetPort: 8080
-
-# After
-targetPort: 80     # matched to corrected container port
 ```
 
 ### Cluster state after fix
@@ -187,7 +242,7 @@ payments-service-857cbdd94d-6hgnc   1/1     Running   0          40s
 payments-service-857cbdd94d-7lt2g   1/1     Running   0          26s
 ```
 
-Both pods stable, 0 restarts. Full findings in [`FINDINGS.md`](./FINDINGS.md) (written by the agent).
+Full findings in [`FINDINGS.md`](./FINDINGS.md) (written by the agent).
 
 ---
 
@@ -199,53 +254,22 @@ The agent had:
 - ✅ Ability to deploy, redeploy, describe pods, watch rollouts
 
 The agent could NOT access:
-- ❌ Other directories in the workspace outside the mounted path siblings
-- ❌ Other kubeconfig contexts (only the one kubeconfig was in the workspace)
+- ❌ Other directories in the workspace
+- ❌ Other kubeconfig contexts
 - ❌ `~/.aws`, `~/.ssh`, host credentials
 - ❌ Other clusters not in the policy allowlist
-- ❌ Arbitrary internet — only explicitly allowed domains
+- ❌ Arbitrary internet
 
 An agent running directly on the developer's machine would have had access to all of these.
 
 ---
 
-## Friction log: what didn't work
+## Friction encountered
 
-This scenario required significant troubleshooting. The full log is in [`../../docs/friction-log.md`](../../docs/friction-log.md). Summary of what failed before the working setup was found:
+Full diagnostic trail in [`../../docs/friction-log.md`](../../docs/friction-log.md). Summary:
 
-**k3d inside the sandbox:** attempted first. The cluster creation hangs indefinitely. The k3s containers started by the sandbox's private Docker daemon have no proxy configuration — they cannot reach external endpoints during initialization. Not viable without significant additional configuration.
-
-**`host.docker.internal` network policy:** needed explicitly. Even though `host.docker.internal` appears in Docker networking documentation, it is not in the Balanced allowlist by default. Must be added manually.
-
-**`localhost:<PORT>` network policy:** the proxy resolves `host.docker.internal` to `localhost` and applies policy against the resolved address. Adding only `host.docker.internal` is insufficient — the port-specific `localhost:<PORT>` rule is also required.
-
-**TLS verification:** minikube's certificate is issued to `127.0.0.1`. When connecting via `host.docker.internal`, TLS verification fails. `--insecure-skip-tls-verify` or `insecure-skip-tls-verify: true` in the kubeconfig is required.
-
-**macOS `sed` syntax:** macOS BSD `sed` requires `-i ''` (empty string argument). `sed -i 's/...'` without the empty string fails with "unescaped newline inside substitute pattern".
-
-**Claude Code login:** the agent TUI accepts input while not logged in but produces no output. `/login` must be run before giving the agent any task.
-
-**Policy rule removal syntax:** `sbx policy deny` does NOT remove an existing allow rule — it adds a conflicting deny rule and errors. `sbx policy rm network -g --resource <host>` or `sbx policy rm network -g --id <uuid>` is the correct removal command. `sbx policy ls` shows UUIDs. This is not obvious from the CLI help.
-
----
-
-## Cleanup
-
-```bash
-# Remove the deployment from the cluster
-kubectl delete -f /Users/<user>/Source/docker-sandbox-devops/scenarios/kubernetes-debugging/manifests/ \
-  --insecure-skip-tls-verify
-
-# Remove the sandbox
-sbx rm kubernetes-debugging
-
-# Remove the kubeconfig (gitignored but clean up anyway)
-rm scenarios/kubernetes-debugging/kubeconfig-dev.yaml
-
-# Remove the network policy rules added for this scenario
-sbx policy rm network -g --resource host.docker.internal
-sbx policy rm network -g --resource localhost:<PORT>
-
-# Verify rules removed
-sbx policy ls
-```
+- **k3d standard cluster create hangs** — `/dev/kmsg` missing in microVM, flannel VXLAN unsupported by sandbox kernel. Fixed with two `--volume` and `--k3s-arg` flags.
+- **kubectl routes API calls through proxy** — `0.0.0.0` not in `NO_PROXY`, kubectl sends API calls to the sandbox proxy which rejects them. Fixed by adding `0.0.0.0` to `NO_PROXY`.
+- **Policy rule removal syntax** — `sbx policy deny` does not remove allow rules. Correct command: `sbx policy rm network -g --resource <host>`.
+- **macOS sed syntax** — requires `-i ''`. `sed -i 's/...'` fails with "unescaped newline".
+- **Claude Code login** — agent produces no output if not logged in. Run `/login` before giving any task.
