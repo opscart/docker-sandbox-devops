@@ -64,9 +64,11 @@ sbx policy allow network -g host.docker.internal
 sbx policy allow network -g localhost:<PORT>   # your API server port
 ```
 
-> **Why localhost?** The proxy resolves `host.docker.internal` to `localhost` internally and applies policy against `localhost:<PORT>`. Both rules are needed.
+> **Why localhost?** The proxy resolves `host.docker.internal` to `localhost` internally and applies policy against `localhost:<PORT>`. Both rules are needed — adding only `host.docker.internal` is not sufficient.
 
-> **Port changes on restart:** `minikube` assigns a random high port at cluster creation. If your cluster restarts, get the new port from `kubectl cluster-info` and update the policy rule.
+> **Port changes on minikube restart:** minikube assigns a random high port at cluster creation (e.g. `57919`). If minikube restarts, the port changes. Check the current port with `kubectl cluster-info`, remove the old rule (`sbx policy remove <uuid>` — get the UUID from `sbx policy ls`), and add a new one.
+
+> **Registry rules not needed:** `ghcr.io`, `registry-1.docker.io`, `auth.docker.io` are already covered by the default Balanced policy. Do not add them manually.
 
 ### Step 4: Run the sandbox
 
@@ -223,6 +225,8 @@ This scenario required significant troubleshooting. The full log is in [`../../d
 
 **Claude Code login:** the agent TUI accepts input while not logged in but produces no output. `/login` must be run before giving the agent any task.
 
+**Policy rule removal syntax:** `sbx policy deny` does NOT remove an existing allow rule — it adds a conflicting deny rule and errors. `sbx policy rm network -g --resource <host>` or `sbx policy rm network -g --id <uuid>` is the correct removal command. `sbx policy ls` shows UUIDs. This is not obvious from the CLI help.
+
 ---
 
 ## Cleanup
@@ -239,6 +243,9 @@ sbx rm kubernetes-debugging
 rm scenarios/kubernetes-debugging/kubeconfig-dev.yaml
 
 # Remove the network policy rules added for this scenario
-sbx policy deny network -g host.docker.internal
-sbx policy deny network -g localhost:<PORT>
+sbx policy rm network -g --resource host.docker.internal
+sbx policy rm network -g --resource localhost:<PORT>
+
+# Verify rules removed
+sbx policy ls
 ```
