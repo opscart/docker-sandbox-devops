@@ -38,4 +38,4 @@ venv/
 dist/
 build/
 target/
- 
+ scenarios/kubernetes-debugging/kubeconfig-dev.yaml
