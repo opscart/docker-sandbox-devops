@@ -1,5 +1,13 @@
 # docker-sandbox-devops
 
+<p align="center">
+  <img src="./docs/images/banner.png" 
+       alt="Docker Sandbox DevOps — microVM isolation for AI coding agents" 
+       width="100%">
+</p>
+
+![sbx](https://img.shields.io/badge/sbx-v0.30.0-0db7ed?logo=docker&logoColor=white)
+
 ![sbx](https://img.shields.io/badge/sbx-v0.30.0-0db7ed?logo=docker&logoColor=white)
 ![k3d](https://img.shields.io/badge/k3d-v5.7.4-326ce5?logo=kubernetes&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-22c55e)
@@ -68,6 +76,15 @@ Agent → full laptop access         Agent → one repo, one cluster
 
 ---
 
+## Architecture
+
+<p align="center">
+  <img src="./docs/images/architecture.png"
+       alt="Docker Sandbox isolation architecture — macOS host, microVM sandbox, network policy zones"
+       width="100%">
+</p>
+
+---
 ## Quick start
 
 ```bash
