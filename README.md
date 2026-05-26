@@ -1,52 +1,147 @@
 # docker-sandbox-devops
 
-A practical engineering exploration of [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/) for running AI coding agents in isolated microVMs on a developer's laptop.
+![sbx](https://img.shields.io/badge/sbx-v0.30.0-0db7ed?logo=docker&logoColor=white)
+![k3d](https://img.shields.io/badge/k3d-v5.7.4-326ce5?logo=kubernetes&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-22c55e)
+![Platform](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-lightgrey)
+![Status](https://img.shields.io/badge/Docker%20Sandboxes-Early%20Access-f97316)
 
-> **Status:** Exploration-grade. Docker Sandboxes is itself an Early Access product as of May 2026 — features and APIs may change between releases. Pinned versions are tracked in [`tested-with.md`](./tested-with.md). This repo is independent and not affiliated with Docker, Inc.
+A hands-on engineering exploration of [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/) — the isolation layer for running AI coding agents safely on a developer's laptop.
 
-## Why this repo exists
+> **Independent project.** Not affiliated with Docker, Inc. All findings are based on real experiments. Docker Sandboxes is Early Access — features may change. See [`tested-with.md`](./tested-with.md) for verified versions.
 
-AI coding agents like Claude Code, Codex, Gemini CLI, Copilot CLI, Kiro, and OpenCode are increasingly run with permission-skipping flags on developer machines. On a laptop, that means the agent can install packages, modify configs, delete files, and execute arbitrary commands with full user privileges. The blast radius of one mistake is the entire developer environment.
 
-Existing alternatives have trade-offs:
+> **By [Shamsher Khan](https://opscart.com)** — Senior DevOps Engineer, IEEE Senior Member,
+> DZone Core Member, CNCF blog contributor. Part of the
+> [OpsCart](https://opscart.com) technical publication focused on
+> Kubernetes, Docker, and platform engineering.
 
-- **No sandbox** — fast, dangerous.
-- **Plain Docker container** — shared kernel; running Docker inside requires socket mounting, which defeats isolation.
-- **Full VM** — strong isolation, heavy cold-start, discourages routine use.
-- **OS-level sandboxing** — fragmented across platforms.
+---
 
-Docker Sandboxes targets this gap with cross-platform microVMs and a per-sandbox Docker daemon. This repo evaluates it from a DevOps and platform engineering perspective — what works, what breaks, and what patterns emerge in real use.
+## The problem this solves
 
-## What's in scope
+You run Claude Code, Copilot CLI, or Gemini CLI on your laptop. The agent has your full user permissions — every repo, every `.env` file, every kubeconfig context. You give it a task and walk away.
 
-- Reproducible labs walking through install, network policy verification, isolation probes, parallel coding-agent workflows, and custom DevOps environments
-- Scenarios demonstrating integrated workflows (multi-agent orchestration, Kubernetes debugging, CI/CD experimentation)
-- A reusable Kubernetes kit and a DevOps template
-- Architecture notes, threat model, and a live friction log
-- Vendor-neutral comparison with adjacent tools
+Docker Sandboxes runs the agent in a microVM. You mount one directory. The agent sees one directory. Your other repos, credentials, and cluster contexts don't exist inside the sandbox.
 
-## What's not in scope
+```
+Without sandbox                    With Docker Sandbox
+─────────────────                  ───────────────────────────────
+Agent → full laptop access         Agent → one repo, one cluster
+       ↳ all repos                        proxy injects credentials
+       ↳ ~/.aws, ~/.ssh                   private Docker daemon
+       ↳ all kube contexts               network policy enforced
+       ↳ raw API keys in env             kernel-level isolation
+```
 
-- A replacement for cloud-hosted sandboxes (E2B, Modal, Daytona, Cloudflare Sandboxes) — those solve a different problem
-- Production deployment patterns — the product is Early Access; nothing here should be treated as stable
-- Marketing claims about Docker Sandboxes
+---
 
-## Who this is for
+## What's in this repo
 
-- DevOps and platform engineers evaluating local sandboxing for AI coding agents
-- Engineers running coding agents unattended and looking for guardrails
-- Researchers comparing microVM-based isolation to alternatives
+### Labs — 5 verified, real terminal output only
+
+| Lab | What it covers | Key finding |
+|---|---|---|
+| [01 — Install and first run](./labs/01-install-and-first-run/) | `sbx` install, login, daemon lifecycle, network policy selection | Daemon auto-starts on `sbx run`; `sbx version` reports unavailable when daemon is stopped |
+| [02 — Network policy probes](./labs/02-network-policy-probes/) | Balanced policy probe matrix across 13 endpoints | Blocking is HTTP 403, not TCP; DNS unfiltered; HTTP CONNECT allows any port to allowed hosts |
+| [03 — Isolation verification](./labs/03-isolation-verification/) | Filesystem, process, Docker daemon, credential, host network probes | Private Docker Engine per sandbox; credentials never in env; localhost is sandbox-scoped |
+| [04 — Parallel coding agents](./labs/04-parallel-coding-agents/) | `--branch` mode, Git worktrees, multi-agent on one repo | `--branch` shares one microVM; isolation is Git-level not VM-level |
+| [05 — DevOps workloads](./labs/05-devops-workloads/) | Custom template with kubectl, helm, kustomize, azure-cli | kustomize ARM64 install script fails silently; template iteration cycle is the real friction |
+
+### Scenarios — integrated real-world workflows
+
+| Scenario | What it shows | Status |
+|---|---|---|
+| [Kubernetes debugging](./scenarios/kubernetes-debugging/) | AI agent fixes a broken deployment against a real cluster — both k3d (self-contained) and external cluster approaches | ✅ Complete |
+| Multi-agent orchestration | True VM-level isolation using separate workspace directories | 🚧 Planned |
+| CI/CD safe testing | Agent tests pipeline changes safely before running in real CI | 🚧 Planned |
+
+### Docs — synthesized findings
+
+| Doc | Contents |
+|---|---|
+| [`docs/00-overview.md`](./docs/00-overview.md) | What Docker Sandboxes is, at engineering depth |
+| [`docs/architecture-notes.md`](./docs/architecture-notes.md) | microVM, proxy, credential flow, gateway bridge |
+| [`docs/threat-model.md`](./docs/threat-model.md) | What's protected, what has nuance, what isn't |
+| [`docs/comparison-notes.md`](./docs/comparison-notes.md) | `docker run` vs `sbx run` — verified from lab findings |
+| [`docs/friction-log.md`](./docs/friction-log.md) | Dated, real-time capture of what broke and how it was fixed |
+
+---
+
+## Quick start
+
+```bash
+# Install
+brew install docker/tap/sbx    # macOS
+winget install Docker.sbx      # Windows
+
+# Login and select network policy
+sbx login
+
+# Run your first sandbox
+sbx run claude
+
+# Verify isolation
+sbx exec -it <sandbox-name> bash
+env | grep -i anthropic    # empty — credentials never enter the sandbox
+ls /Users/<you>/           # shows only the mounted project
+```
+
+Start with [`labs/01-install-and-first-run/`](./labs/01-install-and-first-run/) for a complete walkthrough.
+
+---
+
+## Kubernetes debugging scenario
+
+The flagship scenario: an AI agent investigates and fixes a broken Kubernetes deployment — running an entire k3d cluster inside the sandbox using the private Docker daemon.
+
+```bash
+# 1. Start sandbox with DevOps toolkit
+sbx run claude \
+  --template shamsk22/sbx-devops-toolkit:v1.1.0 \
+  --name kubernetes-debugging
+
+# 2. Create k3d cluster inside the sandbox (sbx-specific fixes included)
+bash scripts/k3d-create-sbx.sh
+
+# 3. Deploy broken app and give agent the task
+bash scripts/reset-demo.sh
+# → agent finds two bugs, fixes manifests, redeploys, verifies stability
+# → destroy sandbox: cluster, workloads, and agent state are all gone
+```
+
+> **Why k3d inside the sandbox needs a special script:** the microVM kernel doesn't expose `/dev/kmsg` and doesn't support VXLAN (flannel's default backend). See [`docs/friction-log.md`](./docs/friction-log.md) for the full diagnostic trail and the three-part fix.
+
+---
+
+## Custom DevOps template
+
+```dockerfile
+FROM docker/sandbox-templates:claude-code-docker
+# adds: kubectl v1.31.4, helm v3.16.4, kustomize v5.4.3, azure-cli 2.86.0, k3d v5.7.4
+```
+
+Built and published at `shamsk22/sbx-devops-toolkit:v1.1.0`. Build your own:
+
+```bash
+docker build --platform linux/arm64 \
+  -t <your-registry>/sbx-devops-toolkit:v1.0.0 \
+  templates/dev-environment/
+docker push <your-registry>/sbx-devops-toolkit:v1.0.0
+```
+
+---
 
 ## Repo layout
 
 ```
 docker-sandbox-devops/
 ├── docs/
-│   ├── 00-overview.md         # what Docker Sandboxes is, at engineering depth
-│   ├── architecture-notes.md  # microVM, proxy, credential flow observations
-│   ├── threat-model.md        # what's protected, what isn't
-│   ├── comparison-notes.md    # honest comparison with adjacent tools
-│   └── friction-log.md        # dated, real-time capture of what broke
+│   ├── 00-overview.md          # engineering overview
+│   ├── architecture-notes.md   # microVM, proxy, credential flow
+│   ├── threat-model.md         # what's protected and what isn't
+│   ├── comparison-notes.md     # docker run vs sbx run (lab-verified)
+│   └── friction-log.md         # live log — what broke and how it was fixed
 ├── labs/
 │   ├── 01-install-and-first-run/
 │   ├── 02-network-policy-probes/
@@ -54,31 +149,42 @@ docker-sandbox-devops/
 │   ├── 04-parallel-coding-agents/
 │   └── 05-devops-workloads/
 ├── scenarios/
-│   ├── multi-agent-orchestration/
-│   ├── kubernetes-debugging/
-│   └── ci-cd-safe-testing/
-├── kits/
-│   └── kubernetes-toolkit/    # kubectl, helm, kustomize, K8s API allowlist
+│   └── kubernetes-debugging/
+│       ├── manifests/           # working state (agent writes here)
+│       ├── manifests-broken/    # original broken state for demo resets
+│       ├── TASK.md              # agent's instruction file
+│       └── FINDINGS.md          # agent-generated findings report
 ├── templates/
-│   └── dev-environment/       # Dockerfile-based reusable sandbox base
-└── scripts/
-    ├── verify-isolation.sh
-    └── network-policy-matrix.sh
+│   └── dev-environment/
+│       └── Dockerfile           # DevOps toolkit image
+├── scripts/
+│   ├── k3d-create-sbx.sh        # k3d cluster creation with sbx fixes
+│   └── reset-demo.sh            # restore broken state for repeated demos
+├── tested-with.md               # sbx version + per-lab verification status
+└── CLAUDE.md                    # context file for Claude Code
 ```
 
-Only files that exist today are committed. Empty directories will be added as labs and scenarios are completed and verified.
-
-## Quick start
-
-Start with [`labs/01-install-and-first-run/`](./labs/01-install-and-first-run/). It walks through installing `sbx`, signing in, selecting a network policy, running a first sandbox, and verifying with `sbx ls`.
+---
 
 ## Tested with
 
-See [`tested-with.md`](./tested-with.md) for current `sbx` versions and host configurations under which each lab has been verified.
+| Component | Version |
+|---|---|
+| `sbx` | v0.30.0 |
+| Host | macOS Apple Silicon |
+| DevOps template | `shamsk22/sbx-devops-toolkit:v1.1.0` |
+| k3d | v5.7.4 |
+| k3s | v1.30.4+k3s1 |
+
+All labs verified. See [`tested-with.md`](./tested-with.md) for per-lab status.
+
+---
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Issues, kit contributions, scenario PRs, and friction-log entries all welcome.
+Issues, kit contributions, scenario PRs, and friction-log entries are welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+
+No invented terminal output. No unverified claims. Vendor-neutral tone.
 
 ## License
 
@@ -86,4 +192,9 @@ MIT. See [`LICENSE`](./LICENSE).
 
 ## Maintainer
 
-[Shamsher Khan](https://opscart.com) — Senior DevOps Engineer, IEEE Senior Member, DZone Core Member.
+**[Shamsher Khan](https://opscart.com)** — Senior DevOps Engineer managing 8+ AKS clusters
+for Fortune 500 clients. IEEE Senior Member · DZone Core Member · CNCF blog contributor.
+
+- 🌐 [opscart.com](https://opscart.com)
+- 🐙 [github.com/opscart](https://github.com/opscart)
+- 📝 [DZone profile](https://dzone.com/users/shamsk22)
