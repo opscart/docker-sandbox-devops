@@ -45,7 +45,7 @@ From the repo root, with Docker Desktop running:
 ```bash
 docker build \
   --platform linux/arm64 \
-  -t shamsk22/sbx-devops-toolkit:v1.0.0 \
+  -t ghcr.io/opscart/sbx-devops-toolkit:v1.1.0 \
   templates/dev-environment/
 ```
 
@@ -68,7 +68,7 @@ Layer 7 is the smoke test — if any tool is missing from PATH the build fails h
 
 ```bash
 docker login   # authenticates with your Docker Hub credentials
-docker push shamsk22/sbx-devops-toolkit:v1.0.0
+docker push ghcr.io/opscart/sbx-devops-toolkit:v1.1.0
 ```
 
 > **Image naming:** tag must match your Docker Hub username, not your GitHub org handle. `opscart/sbx-devops-toolkit` fails if `opscart` is not a Docker Hub org you own. To use the `opscart` namespace, create the org at hub.docker.com first.
@@ -77,7 +77,7 @@ docker push shamsk22/sbx-devops-toolkit:v1.0.0
 
 ```bash
 sbx run claude \
-  --template shamsk22/sbx-devops-toolkit:v1.0.0 \
+  --template ghcr.io/opscart/sbx-devops-toolkit:v1.1.0 \
   --name 05-devops-workloads
 ```
 
@@ -87,7 +87,7 @@ Real output:
 Creating new sandbox '05-devops-workloads'...
 723fcd1034df: Download complete
 ...
-Status: Downloaded newer image for shamsk22/sbx-devops-toolkit:v1.0.0
+Status: Downloaded newer image for ghcr.io/opscart/sbx-devops-toolkit:v1.1.0
 INFO: Configuring Docker
 ✓ Created sandbox '05-devops-workloads'
   Workspace: /Users/opscart/Source/docker-sandbox-devops (direct mount)
@@ -194,7 +194,7 @@ kubectl get namespaces
 
 ### 1. The template is the reproducibility unit
 
-A custom template pins the exact toolchain. Every engineer who runs `sbx run --template shamsk22/sbx-devops-toolkit:v1.0.0` gets kubectl v1.31.4, helm v3.16.4, kustomize v5.4.3 — regardless of what's installed on their host. No "works on my machine" for the DevOps toolchain.
+A custom template pins the exact toolchain. Every engineer who runs `sbx run --template ghcr.io/opscart/sbx-devops-toolkit:v1.1.0` gets kubectl v1.31.4, helm v3.16.4, kustomize v5.4.3 — regardless of what's installed on their host. No "works on my machine" for the DevOps toolchain.
 
 ### 2. Build on host, run in sandbox
 
@@ -223,9 +223,9 @@ To update tool versions, change the ARG values in the Dockerfile and rebuild:
 docker build \
   --platform linux/arm64 \
   --no-cache \
-  -t shamsk22/sbx-devops-toolkit:v1.1.0 \
+  -t ghcr.io/opscart/sbx-devops-toolkit:v1.1.0 \
   templates/dev-environment/
-docker push shamsk22/sbx-devops-toolkit:v1.1.0
+docker push ghcr.io/opscart/sbx-devops-toolkit:v1.1.0
 ```
 
 Use `--no-cache` when upgrading to force all layers to rebuild. Tag with a new version — don't overwrite `:v1.0.0` in place, so existing sandboxes remain reproducible.

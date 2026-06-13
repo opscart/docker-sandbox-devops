@@ -6,7 +6,7 @@ Run two Claude Code agents simultaneously on the same repository using `--branch
 
 ## sbx version verified
 
-`v0.30.0` on macOS Apple Silicon. See [`../../tested-with.md`](../../tested-with.md).
+`v0.31.1` on macOS Apple Silicon. See [`../../tested-with.md`](../../tested-with.md).
 
 ## Prerequisites
 
@@ -171,6 +171,8 @@ Git isolation confirmed. Files committed to `lab04-agent-a` do not appear in `la
 | Network stack | ❌ Shared — same network policy and proxy |
 | Credentials | ❌ Shared — same proxy credential injection |
 
+**v0.31.1 adds `--clone` as an alternative.** Instead of a worktree,`--clone` runs the agent on a full in-container clone. The host repo is mounted read-only. Changes only reach the host when you explicitly run `git fetch sandbox-<name>`. Commits are lost on `sbx rm` unless fetched first. Use `--clone` when you want stronger filesystem isolation; use `--branch` when you want changes visible on the host immediately.
+
 ## Observations
 
 ### 1. One sandbox per workspace directory
@@ -233,6 +235,28 @@ macOS host
     │   ├── lab04-agent-a/   ← Agent A working here (branch: lab04-agent-a)
     │   └── lab04-agent-b/   ← Agent B working here (branch: lab04-agent-b)
     └── /Users/opscart/Source/docker-sandbox-devops/  (main worktree, read by both)
+```
+
+## Alternative: --clone mode (v0.31.1+)
+
+```bash
+sbx run claude --name 04-agent-a --clone
+```
+
+Key differences from --branch:
+
+| | --branch | --clone |
+|---|---|---|
+| Host repo | Read-write via worktree | Read-only at /run/sandbox/source |
+| Changes on host | Immediately visible | Only after git fetch |
+| On sbx rm | Files stay on host | Commits lost unless fetched first |
+
+To recover agent's work before removing:
+
+```bash
+git fetch sandbox-04-agent-a
+git branch my-feature refs/sandboxes/04-agent-a/
+sbx rm 04-agent-a
 ```
 
 ## Cleanup

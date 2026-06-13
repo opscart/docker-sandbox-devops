@@ -115,7 +115,7 @@ The flagship scenario: an AI agent investigates and fixes a broken Kubernetes de
 ```bash
 # 1. Start sandbox with DevOps toolkit
 sbx run claude \
-  --template shamsk22/sbx-devops-toolkit:v1.1.0 \
+  --template ghcr.io/opscart/sbx-devops-toolkit:v1.1.0 \
   --name kubernetes-debugging
 
 # 2. Create k3d cluster inside the sandbox (sbx-specific fixes included)
@@ -138,7 +138,7 @@ FROM docker/sandbox-templates:claude-code-docker
 # adds: kubectl v1.31.4, helm v3.16.4, kustomize v5.4.3, azure-cli 2.86.0, k3d v5.7.4
 ```
 
-Built and published at `shamsk22/sbx-devops-toolkit:v1.1.0`. Build your own:
+Built and published at `ghcr.io/opscart/sbx-devops-toolkit:v1.1.0`. Build your own:
 
 ```bash
 docker build --platform linux/arm64 \
@@ -189,7 +189,7 @@ docker-sandbox-devops/
 |---|---|
 | `sbx` | v0.30.0 |
 | Host | macOS Apple Silicon |
-| DevOps template | `shamsk22/sbx-devops-toolkit:v1.1.0` |
+| DevOps template | `ghcr.io/opscart/sbx-devops-toolkit:v1.1.0` |
 | k3d | v5.7.4 |
 | k3s | v1.30.4+k3s1 |
 

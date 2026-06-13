@@ -24,13 +24,13 @@ The cluster runs entirely inside the sandbox using its private Docker daemon. No
 
 - `sbx` v0.30.0 installed and authenticated
 - DevOps toolkit template v1.1.0 (includes kubectl, helm, kustomize, azure-cli, k3d):
-  `shamsk22/sbx-devops-toolkit:v1.1.0`
+  `ghcr.io/opscart/sbx-devops-toolkit:v1.1.0`
 
 ### Step 1: Start the sandbox
 
 ```bash
 sbx run claude \
-  --template shamsk22/sbx-devops-toolkit:v1.1.0 \
+  --template ghcr.io/opscart/sbx-devops-toolkit:v1.1.0 \
   --name kubernetes-debugging
 ```
 
@@ -125,7 +125,7 @@ The cluster runs on the host machine. The sandbox agent connects to it via a san
 ### Prerequisites
 
 - `sbx` v0.30.0 installed and authenticated
-- DevOps toolkit template: `shamsk22/sbx-devops-toolkit:v1.1.0`
+- DevOps toolkit template: `ghcr.io/opscart/sbx-devops-toolkit:v1.1.0`
 - A running Kubernetes cluster on your host: `kubectl get nodes`
 
 ### Step 1: Extract a sanitized kubeconfig
@@ -173,7 +173,7 @@ sbx policy allow network -g localhost:<PORT>
 
 ```bash
 sbx run claude \
-  --template shamsk22/sbx-devops-toolkit:v1.1.0 \
+  --template ghcr.io/opscart/sbx-devops-toolkit:v1.1.0 \
   --name kubernetes-debugging
 ```
 

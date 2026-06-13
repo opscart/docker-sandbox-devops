@@ -1,10 +1,21 @@
-# Agent Task: Investigate and Fix payments-service OOMKill
+# Agent Task: Investigate and Fix payments-service Pod Failures
 
 ## Situation
 
-The `payments-service` in the development cluster is OOMKilling under normal traffic.
+The `payments-service` in the development cluster is failing and restarting repeatedly.
 On-call flagged repeated restarts overnight. Pod restarts are increasing and the service
-is affecting downstream checkout flow.
+is affecting downstream checkout flow. The root cause is unknown — investigate everything.
+
+## Environment setup (run before any kubectl commands)
+
+```bash
+export KUBECONFIG=/home/agent/.config/k3d/kubeconfig-dev-cluster.yaml
+export NO_PROXY="${NO_PROXY},0.0.0.0"
+```
+
+These must be set in every shell session before using kubectl. The k3d API
+server runs locally inside the sandbox — without NO_PROXY, kubectl routes
+through the sandbox proxy and the connection fails.
 
 ## What you have access to
 
@@ -14,20 +25,21 @@ is affecting downstream checkout flow.
 
 ## Your task
 
-1. Deploy the payments-service to the dev-cluster
-2. Investigate the resource configuration
-3. Identify why OOMKill is occurring
-4. Fix the memory limits to appropriate values for a payment processing service
-5. Redeploy and verify the pods are stable
+1. Run the environment setup commands above first
+2. Deploy the payments-service to the dev-cluster
+3. Investigate ALL reasons the pods are failing — check events, logs, probe configuration, and resource limits
+4. Fix every issue you find in the manifest files
+5. Redeploy and verify both pods are stable with 0 restarts
 6. Document what you changed and why in `scenarios/kubernetes-debugging/FINDINGS.md`
 
 ## Constraints
 
 - Do not modify anything outside `scenarios/kubernetes-debugging/`
 - Do not create new namespaces
-- The fix must be in the manifest file — not a `kubectl patch` one-liner
+- All fixes must be in the manifest files — not `kubectl patch` one-liners
 
 ## Expected output
 
-- Updated `manifests/payments-deployment.yaml` with corrected resource limits
-- `FINDINGS.md` explaining the root cause and the fix
+- Updated `manifests/payments-deployment.yaml` with all issues fixed
+- Updated `manifests/payments-service.yaml` if needed
+- `FINDINGS.md` explaining every root cause and fix

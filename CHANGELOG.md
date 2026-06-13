@@ -19,5 +19,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `labs/03-isolation-verification/` — filesystem mount boundary, PID namespace, Docker daemon isolation, credential env, host network
 - `labs/04-parallel-coding-agents/` — branch mode, Git worktrees, one sandbox per workspace, cleanup behavior
 - `labs/05-devops-workloads/` — custom template build, DevOps toolchain (kubectl/helm/kustomize/azure-cli), network policy for cluster access
-- `templates/dev-environment/Dockerfile` — DevOps toolkit image, published as `shamsk22/sbx-devops-toolkit:v1.0.0`
+- `templates/dev-environment/Dockerfile` — DevOps toolkit image, published as `ghcr.io/opscart/sbx-devops-toolkit:v1.1.0`
 - All labs verified against `sbx` v0.30.0 on macOS Apple Silicon

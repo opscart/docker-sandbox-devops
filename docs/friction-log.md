@@ -286,3 +286,47 @@ kube-system   traefik-5fb479b77-cjnsp                   0/1     ContainerCreatin
 **sbx version:** v0.30.0
 
 **Follow-up:** Investigate whether a minimal k3d config (single-node, `--flannel-backend=host-gw`, `--volume /dev/null:/dev/kmsg@all`) should be codified as the canonical sbx-compatible cluster spec in `scenarios/kubernetes-debugging/`. Also investigate whether using k3d's `--registry-create` flag inside sbx requires additional kernel capabilities.
+
+---
+
+## 2026-05-31 — v0.31.1 breaking changes and new features
+
+**Context:** Upgraded from v0.30.0 to v0.31.1 via `brew upgrade docker/tap/sbx` during video recording preparation.
+
+**Observation:**
+
+```
+$ sbx version
+Client Version:  v0.31.1 e658be1864d12077575ba41e589172cbc40c6c6d
+Server Version:  v0.31.1 e658be1864d12077575ba41e589172cbc40c6c6d
+```
+
+**Breaking changes:**
+
+1. **`sbx --version` removed.** Use `sbx version` (no dashes).
+
+2. **Network policy prompt removed from `sbx login`.** Set policy separately:
+```bash
+sbx policy set-default balanced    # recommended default
+sbx policy set-default allow-all   # was: "Open"
+sbx policy set-default deny-all    # was: "Locked Down"
+```
+
+3. **Policy tier names changed:** Open → `allow-all`, Balanced → `balanced`, Locked Down → `deny-all`.
+
+**New features:**
+
+1. **`--clone` mode** — agent works on full in-container clone, host repo read-only. Changes reach host via `git fetch sandbox-<name>`. `--branch` unchanged and still works.
+
+2. **`sbx` interactive TUI** — running `sbx` with no subcommands opens sandbox dashboard with network governance panel.
+
+3. **`sbx ports`** — forward traffic from host into running sandbox:
+```bash
+sbx ports my-sandbox --publish 8080:3000
+```
+
+4. **`sbx create`** — create without attaching, attach later with `sbx run`.
+
+5. **`--branch auto`** — auto-generate branch name.
+
+**sbx version:** v0.31.1

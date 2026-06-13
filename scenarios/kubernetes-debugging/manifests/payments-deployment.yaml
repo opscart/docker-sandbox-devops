@@ -1,8 +1,4 @@
 ---
-# payments-service deployment
-# Deliberately under-resourced memory limit to simulate OOMKill scenario.
-# The service processes payment requests which require ~150Mi at peak load.
-# Current limit of 64Mi causes OOMKill under normal traffic.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -27,7 +23,7 @@ spec:
         - name: payments-service
           image: nginx:alpine          # placeholder — real image would be internal registry
           ports:
-            - containerPort: 8080
+            - containerPort: 80
           env:
             - name: APP_ENV
               value: "development"
@@ -38,20 +34,20 @@ spec:
           resources:
             requests:
               cpu: "100m"
-              memory: "64Mi"          # too low — service needs ~150Mi at peak
+              memory: "128Mi"
             limits:
               cpu: "200m"
-              memory: "64Mi"          # OOMKill happens here under load
+              memory: "256Mi"
           livenessProbe:
             httpGet:
-              path: /healthz
-              port: 8080
+              path: /
+              port: 80
             initialDelaySeconds: 10
             periodSeconds: 15
           readinessProbe:
             httpGet:
-              path: /ready
-              port: 8080
+              path: /
+              port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
       restartPolicy: Always
